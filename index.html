@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Anniversary Strike</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap">
+<style>
+/* Layout: una sola pantalla tipo HUD de battle royale; cada fase (lobby, caída, airdrop, escuadrón, invitación, victoria) reemplaza a la anterior. */
+:root {
+  --bg: #0c0b0d;        /* fondo */
+  --panel: #18161a;     /* paneles */
+  --line: #34303a;      /* bordes */
+  --orange: #ff6a13;    /* acento principal */
+  --blood: #e0202f;     /* rojo sangre / corazones */
+  --sand: #ece3d2;      /* texto */
+  --dim: #948d99;       /* texto secundario */
+  --zone: #4f8dff;      /* la zona */
+  --gold: #ffc247;      /* loot legendario / victoria */
+  --font-display: "Black Ops One", "Impact", sans-serif;
+  --font-body: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Share Tech Mono", "Consolas", monospace;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background:
+    radial-gradient(ellipse at 50% -20%, rgba(255,106,19,.16), transparent 60%),
+    var(--bg);
+  color: var(--sand);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 1.35;
+  display: flex; justify-content: center; align-items: center;
+  padding-inline: 16px; padding-block: 16px;
+  overflow-x: hidden;
+}
+
+.frame {
+  position: relative; width: 100%; max-width: 460px; min-height: 600px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 26px 18px 24px;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.frame::before { /* cinta de peligro */
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 8px;
+  background: repeating-linear-gradient(-45deg, var(--orange) 0 10px, var(--bg) 10px 20px);
+}
+.frame::after { /* esquinas de mira */
+  content: ""; position: absolute; inset: 14px 8px 8px; pointer-events: none;
+  background:
+    linear-gradient(var(--orange), var(--orange)) left top / 14px 2px,
+    linear-gradient(var(--orange), var(--orange)) left top / 2px 14px,
+    linear-gradient(var(--orange), var(--orange)) right bottom / 14px 2px,
+    linear-gradient(var(--orange), var(--orange)) right bottom / 2px 14px;
+  background-repeat: no-repeat; opacity: .7;
+}
+
+.topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 13px; letter-spacing: .08em; color: var(--dim); text-transform: uppercase; }
+.topbar b { color: var(--orange); font-weight: 400; }
+.controls { display: flex; align-items: center; gap: 10px; }
+.vol { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.vol input { width: 76px; accent-color: var(--orange); cursor: pointer; }
+.mute { font: inherit; color: var(--sand); background: transparent; border: 1px solid var(--line); padding: 6px 10px; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+
+.screen { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; padding-top: 12px; position: relative; z-index: 1; }
+.eyebrow { font-family: var(--font-mono); font-size: 13px; letter-spacing: .22em; color: var(--orange); text-transform: uppercase; }
+.display { font-family: var(--font-display); font-weight: 400; line-height: 1; margin: 0; text-transform: uppercase; text-wrap: balance; }
+.small { font-size: 16px; color: var(--dim); margin: 0; max-width: 34ch; }
+.sign { font-weight: 700; font-size: 19px; margin: 0; }
+
+.btn {
+  font-family: var(--font-display); font-size: 22px; letter-spacing: .04em;
+  color: var(--bg); background: var(--orange); border: 0; cursor: pointer;
+  padding: 13px 30px 11px;
+  clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+  transition: filter .15s, transform .08s;
+}
+.btn:hover { filter: brightness(1.1); }
+.btn:active { transform: translateY(2px); }
+.btn.alt { background: var(--sand); }
+.btn.ghost { background: transparent; color: var(--sand); box-shadow: inset 0 0 0 2px var(--sand); clip-path: none; font-size: 18px; padding: 10px 20px 8px; }
+
+/* ---------- Foto / retrato ---------- */
+.foto { width: 100%; height: 100%; object-fit: cover; display: block; }
+.inicial { width: 100%; height: 100%; display: grid; place-items: center; font-family: var(--font-display); font-size: 72px; color: var(--bg); background: linear-gradient(160deg, var(--orange), var(--blood)); }
+
+/* ---------- Lobby (bloqueo) ---------- */
+.lock-pic { position: relative; width: 130px; height: 150px; border: 3px solid var(--orange); }
+.lock-badge { position: absolute; right: -14px; bottom: -14px; width: 44px; height: 44px; display: grid; place-items: center; background: var(--orange); box-shadow: 0 0 0 4px var(--panel); }
+.lock-ico { width: 24px; height: 24px; color: var(--bg); }
+.countdown { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.cd { background: var(--bg); border-top: 2px solid var(--orange); padding: 12px 4px 8px; }
+.cd b { display: block; font-family: var(--font-mono); font-weight: 400; font-size: 38px; line-height: 1; font-variant-numeric: tabular-nums; }
+.cd small { font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; color: var(--dim); }
+.waiting { font-family: var(--font-mono); font-size: 13px; letter-spacing: .14em; color: var(--zone); text-transform: uppercase; }
+.waiting::after { content: ""; animation: dots 1.6s steps(4) infinite; }
+@keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+
+/* ---------- Selección de Striker ---------- */
+.striker { width: 100%; display: grid; grid-template-columns: 116px 1fr; gap: 14px; text-align: left; align-items: stretch; }
+.portrait { position: relative; min-height: 156px; overflow: hidden; border: 2px solid var(--orange); }
+.portrait::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(12,11,13,.9), transparent 50%); }
+.portrait small { position: absolute; z-index: 1; bottom: 6px; left: 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; color: var(--orange); }
+.info { min-width: 0; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.info .display { font-size: clamp(34px, 10vw, 48px); overflow-wrap: anywhere; }
+.role { font-family: var(--font-mono); font-size: 13px; letter-spacing: .16em; color: var(--orange); text-transform: uppercase; }
+.skills { width: 100%; display: grid; gap: 6px; }
+.sk { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; background: var(--bg); padding: 7px 10px; text-align: left; border-left: 3px solid var(--line); }
+.sk kbd { font-family: var(--font-display); font-size: 17px; color: var(--bg); background: var(--sand); text-align: center; padding-top: 3px; }
+.sk b { font-weight: 700; font-size: 17px; display: block; line-height: 1.1; }
+.sk span { font-size: 14px; color: var(--dim); }
+.sk.ult { border-left-color: var(--orange); }
+.sk.ult kbd { background: var(--orange); }
+
+/* ---------- Fase 1: caída ---------- */
+.hud { width: 100%; display: flex; justify-content: space-between; align-items: end; font-family: var(--font-mono); font-size: 12px; letter-spacing: .1em; color: var(--dim); text-transform: uppercase; }
+.hud strong { display: block; font-size: 30px; font-weight: 400; color: var(--sand); line-height: 1; font-variant-numeric: tabular-nums; }
+.hud .r { text-align: right; } .hud .r strong { color: var(--blood); }
+.bar { width: 100%; height: 4px; background: var(--bg); }
+.bar > i { display: block; height: 100%; width: 0; background: var(--orange); transition: width .25s; }
+.arena { position: relative; width: 100%; }
+#game { display: block; width: 100%; aspect-ratio: 4 / 5; background: var(--bg); touch-action: none; cursor: crosshair; }
+.feed { position: absolute; top: 8px; right: 8px; display: grid; gap: 4px; justify-items: end; pointer-events: none; }
+.feed div { font-family: var(--font-mono); font-size: 12px; background: rgba(12,11,13,.85); border-right: 3px solid var(--orange); padding: 3px 8px; animation: feedIn .2s ease-out; }
+.feed div.hs { border-right-color: var(--blood); }
+.feed em { font-style: normal; color: var(--orange); }
+@keyframes feedIn { from { transform: translateX(20px); opacity: 0; } }
+.wipe { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; background: rgba(12,11,13,.55); }
+.wipe span { font-family: var(--font-display); font-size: clamp(36px, 11vw, 54px); color: var(--orange); text-shadow: 0 0 24px rgba(255,106,19,.6); animation: pop .6s cubic-bezier(.2,1.6,.4,1); text-align: center; line-height: 1; }
+@keyframes pop { from { transform: scale(2.2); opacity: 0; } }
+
+/* ---------- Fase 2: airdrop con loot ---------- */
+#drop { width: 100%; aspect-ratio: 96 / 80; image-rendering: pixelated; display: block; cursor: pointer; }
+.drop-box { width: 100%; max-width: 330px; background: var(--bg); padding: 14px; border: 1px solid var(--line); transition: max-width .4s; }
+.drop-box.small-box { max-width: 170px; padding: 8px; }
+.loot { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.card {
+  position: relative; min-height: 150px; text-align: left; cursor: pointer;
+  font: inherit; color: var(--sand); border: 0; padding: 14px;
+  background: linear-gradient(160deg, rgba(255,194,71,.18), transparent 55%), var(--bg);
+  box-shadow: inset 0 0 0 2px var(--gold);
+  display: flex; flex-direction: column; gap: 6px; justify-content: flex-end;
+  animation: drop-in .45s cubic-bezier(.2,1.4,.4,1) both;
+}
+.card:nth-child(2) { animation-delay: .12s; } .card:nth-child(3) { animation-delay: .24s; } .card:nth-child(4) { animation-delay: .36s; }
+@keyframes drop-in { from { transform: translateY(-30px); opacity: 0; } }
+.card small { font-family: var(--font-mono); font-size: 11px; letter-spacing: .16em; color: var(--gold); text-transform: uppercase; }
+.card b { font-family: var(--font-display); font-weight: 400; font-size: 22px; line-height: 1.05; }
+.card p { margin: 0; font-size: 16px; color: var(--sand); }
+.card .tap { font-family: var(--font-mono); font-size: 12px; color: var(--dim); }
+.card .hide { display: none; }
+.card.open .hide { display: block; }
+.card.open .tap { display: none; }
+.card.open { box-shadow: inset 0 0 0 2px var(--orange); }
+
+/* ---------- Fase 3: escuadrón ---------- */
+.chat { width: 100%; background: var(--bg); border: 1px solid var(--line); padding: 12px 14px; text-align: left; display: flex; flex-direction: column; gap: 10px; height: 340px; overflow-y: auto; cursor: pointer; }
+.msg { font-size: 18px; line-height: 1.35; margin: 0; overflow-wrap: anywhere; }
+.msg .ch { font-family: var(--font-mono); font-size: 13px; color: var(--dim); }
+.msg .who { font-weight: 700; color: var(--orange); }
+.msg.sys { font-family: var(--font-mono); font-size: 14px; color: var(--gold); }
+.caret { display: inline-block; width: 8px; height: 1em; background: var(--sand); vertical-align: -2px; animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
+.chat-foot { width: 100%; display: flex; justify-content: space-between; gap: 10px; font-family: var(--font-mono); font-size: 12px; letter-spacing: .1em; color: var(--dim); text-transform: uppercase; }
+
+/* ---------- Fase 4: invitación ---------- */
+.invite { position: relative; width: 100%; min-height: 300px; background: var(--bg); border: 1px solid var(--line); border-top: 3px solid var(--orange); padding: 22px 16px 90px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.invite .heart { font-size: 46px; color: var(--blood); animation: beat 1.1s ease-in-out infinite; line-height: 1; }
+@keyframes beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.18); } 30% { transform: scale(1); } 45% { transform: scale(1.12); } }
+.invite .display { font-size: 26px; }
+.invite-btns { position: absolute; left: 12px; right: 12px; bottom: 18px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; }
+.invite-btns .btn { font-size: 19px; padding-inline: 22px; }
+#noBtn.loose { position: absolute; transition: left .18s, top .18s; }   /* se suelta y escapa dentro de la tarjeta */
+
+/* ---------- Victoria ---------- */
+.rank1 { font-family: var(--font-display); font-size: clamp(80px, 26vw, 120px); line-height: .9; color: var(--gold); text-shadow: 0 0 30px rgba(255,194,71,.35); }
+.victory { font-size: clamp(30px, 9vw, 42px); }
+.mvp { width: 100%; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; text-align: left; background: var(--bg); border-top: 3px solid var(--gold); padding: 14px; }
+.mvp-pic { position: relative; width: 78px; height: 78px; box-shadow: 0 0 0 3px var(--gold); }
+.mvp-pic .inicial { font-size: 40px; }
+.mvp .badge { position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%); font-family: var(--font-display); font-size: 14px; color: var(--bg); background: var(--gold); padding: 3px 8px 1px; white-space: nowrap; }
+.mvp .display { font-size: 30px; overflow-wrap: anywhere; }
+.mvp > div { min-width: 0; }
+.stats { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.stat { background: var(--bg); padding: 10px 12px; text-align: left; }
+.stat small { display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; color: var(--dim); text-transform: uppercase; }
+.stat b { font-family: var(--font-mono); font-weight: 400; font-size: 28px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat.wide { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border-left: 3px solid var(--blood); }
+.stat.wide b { color: var(--orange); font-size: 34px; }
+.rank-card { width: 100%; display: grid; grid-template-columns: 100px 1fr; gap: 14px; align-items: center; text-align: left; background: radial-gradient(circle at 50px 50%, rgba(255,106,19,.2), transparent 60%), var(--bg); border-top: 3px solid var(--orange); padding: 12px 14px; }
+.rank-card > div { min-width: 0; }
+.emblem { width: 100px; height: 100px; display: block; }
+.emblem .rays { transform-origin: 60px 60px; animation: spin 24s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.rank-name { font-size: 36px; color: var(--orange); }
+.row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.row .btn { font-size: 19px; white-space: nowrap; }
+
+/* ---------- Logros ---------- */
+.toast { position: absolute; left: 18px; right: 18px; top: 54px; z-index: 5; display: flex; gap: 12px; align-items: center; background: var(--bg); border-left: 4px solid var(--gold); padding: 10px 14px; transform: translateY(calc(-100% - 80px)); visibility: hidden; transition: transform .35s cubic-bezier(.2,1.2,.4,1), visibility 0s .35s; }
+.toast.on { transform: none; visibility: visible; transition: transform .35s cubic-bezier(.2,1.2,.4,1); }
+.toast .ico { font-size: 22px; color: var(--gold); }
+.toast small { display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: .16em; color: var(--gold); }
+.toast span { font-family: var(--font-display); font-size: 19px; }
+
+#confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+
+@media (max-width: 340px) { .striker { grid-template-columns: 1fr; } .portrait { min-height: 140px; } }
+@media (prefers-reduced-motion: reduce) { .caret, .feed div, .wipe span, .waiting::after, .emblem .rays, .card, .invite .heart { animation: none; } .toast, #noBtn { transition: none; } }
+</style>
+
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+<main class="frame">
+  <div class="topbar">
+    <span id="stage"><b>●</b> LOBBY</span>
+    <div class="controls">
+      <label class="vol" for="vol">VOL <input type="range" id="vol" min="0" max="100" value="40" aria-label="Volumen"></label>
+      <button class="mute" id="mute" aria-pressed="false">SONIDO ON</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">
+    <div class="ico">✦</div>
+    <div><small>LOGRO DESBLOQUEADO</small><span id="toastText"></span></div>
+  </div>
+
+  <!-- LOBBY: bloqueado hasta el aniversario -->
+  <section class="screen" id="s-lock">
+    <div class="eyebrow">Aniversario · En el lobby</div>
+    <div class="lock-pic">
+      <div class="pic" data-pic></div>
+      <span class="lock-badge">
+        <svg class="lock-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" aria-hidden="true"><rect x="4" y="11" width="16" height="10"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><path d="M12 15v2"/></svg>
+      </span>
+    </div>
+    <h1 class="display" style="font-size:44px">Partida<br>bloqueada</h1>
+    <p class="small">La partida empieza el <b style="color:var(--sand)" data-fecha></b>, el día que cumplimos <span data-meses-txt></span>. Vuelve ese día, <span data-nombre></span>.</p>
+    <div class="countdown">
+      <div class="cd"><b id="cd-d">00</b><small>DÍAS</small></div>
+      <div class="cd"><b id="cd-h">00</b><small>HORAS</small></div>
+      <div class="cd"><b id="cd-m">00</b><small>MIN</small></div>
+      <div class="cd"><b id="cd-s">00</b><small>SEG</small></div>
+    </div>
+    <p class="sign">Paciencia, Striker. Lo bueno se hace esperar 😏</p>
+    <div class="waiting">Esperando a tu dúo</div>
+  </section>
+
+  <!-- SELECCIÓN DE STRIKER -->
+  <section class="screen" id="s-title" hidden>
+    <div class="eyebrow">Aniversario · <span data-meses-txt></span> juntos</div>
+    <div class="striker">
+      <div class="portrait"><div class="pic" data-pic></div><small>STRIKER 01</small></div>
+      <div class="info">
+        <div class="role">◆ Asalto</div>
+        <h1 class="display" data-nombre></h1>
+        <p class="small">Especialidad: ganarse el corazón de su dúo en cada partida.</p>
+      </div>
+    </div>
+    <div class="skills" id="skills"></div>
+    <button class="btn" id="startBtn">¡A SALTAR!</button>
+    <p class="small">Sube el volumen: la partida tiene sonido.</p>
+  </section>
+
+  <!-- FASE 1: CAÍDA -->
+  <section class="screen" id="s-game" hidden>
+    <div class="eyebrow">Fase 1 · Caída en zona caliente</div>
+    <div class="hud">
+      <div>Eliminaciones<strong id="hc">0/12</strong></div>
+      <div class="r">Headshots<strong id="hs">0</strong></div>
+    </div>
+    <div class="bar"><i id="prog"></i></div>
+    <div class="arena">
+      <canvas id="game" tabindex="0" aria-label="Toca los objetivos dentro de la zona. Enter dispara al objetivo más antiguo."></canvas>
+      <div class="feed" id="feed"></div>
+      <div class="wipe" id="wipe" hidden><span>Escuadrón<br>eliminado</span></div>
+    </div>
+    <p class="small">Toca los objetivos antes de que desaparezcan. La zona se va cerrando.</p>
+  </section>
+
+  <!-- FASE 2: AIRDROP -->
+  <section class="screen" id="s-drop" hidden>
+    <div class="eyebrow">Fase 2 · Airdrop</div>
+    <h2 class="display" id="dropMsg" style="font-size:30px">Suministros en camino</h2>
+    <div class="drop-box" id="dropBox"><canvas id="drop" width="96" height="80" aria-label="Caja de suministros con una sorpresa"></canvas></div>
+    <button class="btn" id="dropBtn" hidden>ABRIR CAJA</button>
+    <div class="loot" id="loot" hidden></div>
+    <button class="btn alt" id="toChat" hidden>SIGUIENTE FASE</button>
+  </section>
+
+  <!-- FASE 3: ESCUADRÓN -->
+  <section class="screen" id="s-chat" hidden>
+    <div class="eyebrow">Fase 3 · Chat del escuadrón</div>
+    <div class="chat" id="chat" tabindex="0" role="button" aria-label="Chat del escuadrón. Toca para ver el siguiente mensaje." aria-live="polite"></div>
+    <div class="chat-foot"><span id="count">1/1</span><span>Toca el chat para seguir ▸</span></div>
+  </section>
+
+  <!-- FASE 4: INVITACIÓN -->
+  <section class="screen" id="s-invite" hidden>
+    <div class="eyebrow">Fase 4 · Invitación de escuadrón</div>
+    <div class="invite" id="invite">
+      <div class="heart" aria-hidden="true">♥</div>
+      <div class="role" style="color:var(--dim)"><span data-chat></span> te invitó a su escuadrón</div>
+      <h2 class="display">¿Jugamos otra temporada juntos?</h2>
+      <p class="small" id="noMsg">Duración: todas las temporadas que quieras.</p>
+      <div class="invite-btns">
+        <button class="btn" id="yesBtn">ACEPTAR</button>
+        <button class="btn ghost" id="noBtn">RECHAZAR</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- VICTORIA -->
+  <section class="screen" id="s-end" hidden>
+    <div class="rank1">#1</div>
+    <h2 class="display victory">Victoria</h2>
+    <div class="role" style="color:var(--dim)"><span data-meses-txt></span> invictos · <span data-fecha></span></div>
+    <div class="mvp">
+      <div class="mvp-pic"><div class="pic" data-pic></div><span class="badge">MVP</span></div>
+      <div><div class="role">Jugadora de la temporada</div><div class="display" data-nombre></div></div>
+    </div>
+    <div class="stats">
+      <div class="stat wide"><small>Días como dúo</small><b id="juntos">0</b></div>
+      <div class="stat"><small>Eliminaciones</small><b id="sh">12</b></div>
+      <div class="stat"><small>Headshots</small><b id="shs">0</b></div>
+      <div class="stat"><small>Precisión</small><b id="sp">0%</b></div>
+      <div class="stat"><small>Loot de recuerdos</small><b id="sl">0/0</b></div>
+    </div>
+    <div class="rank-card">
+      <svg class="emblem" viewBox="0 0 120 120" aria-hidden="true">
+        <defs>
+          <linearGradient id="gFire" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd27a"/><stop offset=".5" stop-color="#ff6a13"/><stop offset="1" stop-color="#a3140f"/></linearGradient>
+          <radialGradient id="gGlow"><stop offset="0" stop-color="#ffd27a" stop-opacity=".8"/><stop offset=".5" stop-color="#ff6a13" stop-opacity=".25"/><stop offset="1" stop-color="#ff6a13" stop-opacity="0"/></radialGradient>
+        </defs>
+        <circle cx="60" cy="60" r="58" fill="url(#gGlow)"/>
+        <g class="rays" fill="#ffd27a" opacity=".7">
+          <path d="M60 2 L63 28 L57 28Z"/><path d="M60 2 L63 28 L57 28Z" transform="rotate(60 60 60)"/><path d="M60 2 L63 28 L57 28Z" transform="rotate(120 60 60)"/>
+          <path d="M60 2 L63 28 L57 28Z" transform="rotate(180 60 60)"/><path d="M60 2 L63 28 L57 28Z" transform="rotate(240 60 60)"/><path d="M60 2 L63 28 L57 28Z" transform="rotate(300 60 60)"/>
+          <path d="M60 12 L62 30 L58 30Z" transform="rotate(30 60 60)"/><path d="M60 12 L62 30 L58 30Z" transform="rotate(90 60 60)"/><path d="M60 12 L62 30 L58 30Z" transform="rotate(150 60 60)"/>
+          <path d="M60 12 L62 30 L58 30Z" transform="rotate(210 60 60)"/><path d="M60 12 L62 30 L58 30Z" transform="rotate(270 60 60)"/><path d="M60 12 L62 30 L58 30Z" transform="rotate(330 60 60)"/>
+        </g>
+        <g fill="url(#gFire)">
+          <path d="M38 50 L6 40 L16 56 L4 62 L22 70 L14 80 L40 74 Z"/>
+          <path d="M82 50 L114 40 L104 56 L116 62 L98 70 L106 80 L80 74 Z"/>
+        </g>
+        <path d="M60 18 L86 28 L84 62 C82 82 70 94 60 102 C50 94 38 82 36 62 L34 28 Z" fill="url(#gFire)" stroke="#ffd27a" stroke-width="2"/>
+        <path d="M60 26 L78 33 L76 62 C74 76 66 86 60 92 C54 86 46 76 44 62 L42 33 Z" fill="none" stroke="#a3140f" stroke-width="1.5" opacity=".8"/>
+        <path d="M60 72 C47 63 49 50 60 56 C71 50 73 63 60 72 Z" fill="#0c0b0d" stroke="#ffd27a" stroke-width="1.5"/>
+      </svg>
+      <div>
+        <div class="role" style="color:var(--gold)">Rango alcanzado</div>
+        <div class="display rank-name">Leyenda</div>
+        <p class="small">Top 1 en mi corazón.</p>
+      </div>
+    </div>
+    <p class="sign" id="firma"></p>
+    <div class="row">
+      <button class="btn" id="replaySong">♪ NUESTRA CANCIÓN</button>
+      <button class="btn ghost" id="restart">JUGAR DE NUEVO</button>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ==================================================================
+   ✏️  CONFIGURACIÓN — EDITA SOLO ESTA PARTE
+   ================================================================== */
+const CONFIG = {
+  nombre: "Izeel",                 // nombre o apodo de ella
+  nombreChat: "zenk♥",               // tu nombre/apodo en el chat del escuadrón
+  firma: "GG. Con amor, chenki ♥",   // despedida al final
+
+  juntosDesde: "2026-08-14",         // el día en que empezaron, formato AAAA-MM-DD
+  meses: 2,                          // qué aniversario celebran (2 = dos meses)
+  bloqueo: true,                     // true = no se abre hasta el día del aniversario (pruébalo con #prueba al final del link)
+
+  foto: "her.jpg",                  // foto de ella en esta misma carpeta ("" para usar su inicial)
+
+  cancion: "Pied Piper.mp3",            // canción en esta misma carpeta ("" para no poner música)
+  cancionInicio: 50,                  // segundo donde empieza la parte que quieres (ej. 0:40 = 40)
+  cancionFin: 112,                     // segundo donde termina (ej. 2:00 = 120). 0 = hasta el final
+
+  // Habilidades de su Striker: [tecla, nombre, descripción]
+  habilidades: [
+    ["C", "Sonrisa táctica", "Desarma a cualquiera en un segundo."],
+    ["Q", "Abrazo curativo", "Recupera toda la vida del escuadrón."],
+    ["E", "Mirada de francotiradora", "Nunca falla. Me dio de lleno."],
+    ["X", "Definitiva: Robar corazones", "Ya la usó conmigo. Efecto permanente."]
+  ],
+
+  // Loot del airdrop: un recuerdo por cada mes. [título, recuerdo]
+  recuerdos: [
+    ["Primera partida", "El día que empezamos y supe que quería seguir jugando contigo."],
+    ["Subimos de nivel", "Cada día de este mes fue mejor que el anterior, y es gracias a ti."]
+  ],
+
+  // El mensaje del chat. Cada línea es un mensaje.
+  // {nombre} se cambia por su nombre y {meses} por "2 meses".
+  mensajes: [
+    "Feliz aniversario, mi amor. Hoy cumplimos {meses} como uno solo.",
+    "Te hice este regalo con mis propias manos... Pensando en ti como siempre. Y con unas cuantas líneas de código.",
+    "Dicen que {meses} es poco, pero contigo se sienten como la mejor temporada que he jugado en esta vida.",
+    "En cada partida busco el mejor loot, pero el mejor que he encontrado en mi vida eres tú.",
+    "Gracias por cubrirme la espalda, por aguantarme y por hacerme reír, en el juego y fuera de él.",
+    "Esto apenas es la primera temporada. Quiero muchas más contigo y solo contigo.",
+    "Te amo. ¡Feliz aniversario! Mi niña, te quiere Chenki  ❤️"
+  ]
+};
+/* ================================================================== */
+
+const META = 12;
+const $ = s => document.querySelector(s);
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const C = { bg: css("--bg"), panel: css("--panel"), line: css("--line"), orange: css("--orange"), blood: css("--blood"), sand: css("--sand"), dim: css("--dim"), zone: css("--zone"), gold: css("--gold") };
+function show(id) { document.querySelectorAll(".screen").forEach(s => s.hidden = s.id !== id); }
+function stage(t) { $("#stage").innerHTML = "<b>●</b> " + t; }
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+/* ---------- datos personalizados ---------- */
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const [jy, jm, jd] = CONFIG.juntosDesde.split("-").map(Number);
+const INICIO = new Date(jy, jm - 1, jd);
+// mismo día, N meses después (si ese mes es más corto, usa su último día: 31 ene + 1 mes = 28/29 feb)
+const ultimoDia = new Date(jy, jm - 1 + CONFIG.meses + 1, 0).getDate();
+const DESBLOQUEO = new Date(jy, jm - 1 + CONFIG.meses, Math.min(jd, ultimoDia), 0, 0, 0);
+const FECHA_TXT = DESBLOQUEO.getDate() + " de " + MESES[DESBLOQUEO.getMonth()];
+const MESES_TXT = CONFIG.meses + (CONFIG.meses === 1 ? " mes" : " meses");
+const fill = (sel, v) => document.querySelectorAll(sel).forEach(el => el.textContent = v);
+fill("[data-nombre]", CONFIG.nombre);
+fill("[data-fecha]", FECHA_TXT);
+fill("[data-meses-txt]", MESES_TXT);
+fill("[data-chat]", CONFIG.nombreChat);
+document.querySelectorAll("[data-pic]").forEach(el => {
+  const fallback = () => { el.className = "inicial"; el.textContent = (CONFIG.nombre[0] || "♥").toUpperCase(); };
+  if (!CONFIG.foto) return fallback();
+  const img = new Image(); img.className = "foto"; img.alt = CONFIG.nombre; img.src = CONFIG.foto;
+  img.onerror = fallback;
+  el.style.cssText = "width:100%;height:100%"; el.append(img);
+});
+CONFIG.habilidades.forEach(([key, name, desc], i) => {
+  const el = document.createElement("div");
+  el.className = "sk" + (i === CONFIG.habilidades.length - 1 ? " ult" : "");
+  el.innerHTML = "<kbd></kbd><div><b></b><span></span></div>";
+  el.querySelector("kbd").textContent = key; el.querySelector("b").textContent = name; el.querySelector("span").textContent = desc;
+  $("#skills").append(el);
+});
+const MENSAJES = CONFIG.mensajes.map(m => m.replaceAll("{nombre}", CONFIG.nombre).replaceAll("{meses}", MESES_TXT));
+
+/* ---------- audio ---------- */
+let ac = null, master = null, muted = false;
+let VOL = $("#vol").value / 100;
+const SONG_MAX = .6;   // la canción nunca pasa del 60% aunque el volumen esté al máximo
+function audio() {
+  if (!ac) {
+    try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+    master = ac.createGain(); master.gain.value = VOL; master.connect(ac.destination);
+  }
+  if (ac.state === "suspended") ac.resume();
+  return ac;
+}
+function tone(freq, start, dur, type = "square", vol = .06, slide) {
+  const a = audio(); if (!a || muted) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, start);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, start + dur);
+  g.gain.setValueAtTime(.0001, start);
+  g.gain.exponentialRampToValueAtTime(vol, start + .01);
+  g.gain.exponentialRampToValueAtTime(.0001, start + dur * .95);
+  o.connect(g).connect(master); o.start(start); o.stop(start + dur);
+}
+function noise(start, dur, vol = .25, freq = 900) {
+  const a = audio(); if (!a || muted) return;
+  const buf = a.createBuffer(1, Math.max(1, a.sampleRate * dur | 0), a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+  const src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  src.buffer = buf; f.type = "bandpass"; f.frequency.value = freq; g.gain.value = vol;
+  src.connect(f).connect(g).connect(master); src.start(start);
+}
+const NOTE = n => { const m = n.match(/([A-G])(#?)(\d)/); const k = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] ? 1 : 0); return 440 * Math.pow(2, ((+m[3] + 1) * 12 + k - 69) / 12); };
+// fanfarria romántica corta: arpegios I – vi – IV – V – I
+const FANFARE = ["C5", "E5", "G5", "E5", "A4", "C5", "E5", "C5", "F4", "A4", "C5", "A4", "G4", "B4", "D5", "G5"];
+function fanfare() {
+  const a = audio(); if (!a || muted) return;
+  let t = a.currentTime + .05;
+  FANFARE.forEach((n, i) => { tone(NOTE(n), t, .16, "triangle", .1); if (i % 4 === 0) tone(NOTE(n) / 2, t, .6, "square", .03); t += .13; });
+  tone(NOTE("C5"), t, .9, "triangle", .12); tone(NOTE("E5"), t, .9, "triangle", .08); tone(NOTE("C4"), t, .9, "square", .03);
+}
+function sfx(n) {
+  const a = audio(); if (!a || muted) return; const t = a.currentTime;
+  if (n === "shot") { noise(t, .14, .4, 1400); tone(150, t, .1, "square", .05, 50); }
+  if (n === "hit") tone(1300, t + .02, .07, "triangle", .12);
+  if (n === "head") { tone(1700, t + .02, .06, "triangle", .14); tone(2500, t + .07, .1, "triangle", .1); }
+  if (n === "jump") { noise(t, .9, .18, 500); tone(300, t, .6, "sawtooth", .03, 90); }
+  if (n === "wipe") [392, 523, 659, 784].forEach((f, i) => tone(f, t + i * .1, .3, "sawtooth", .04));
+  if (n === "achieve") [880, 1175].forEach((f, i) => tone(f, t + i * .09, .16, "triangle", .1));
+  if (n === "plane") noise(t, 1.6, .12, 220);
+  if (n === "thud") { noise(t, .25, .5, 160); tone(90, t, .25, "sine", .2, 40); }
+  if (n === "knock") { noise(t, .08, .35, 600); tone(220, t, .08, "square", .05); }
+  if (n === "card") { tone(660, t, .08, "triangle", .1); tone(1320, t + .07, .14, "triangle", .1); }
+  if (n === "dodge") tone(500, t, .12, "square", .03, 200);
+  if (n === "type" && song.paused) tone(1900 + Math.random() * 300, t, .015, "square", .012);
+  if (n === "msg") tone(990, t, .08, "triangle", .07);
+}
+
+/* canción de fondo (suena desde el chat hasta el final) */
+const song = new Audio();
+if (CONFIG.cancion) { song.src = CONFIG.cancion; song.preload = "auto"; }
+song.volume = 0;
+song.addEventListener("timeupdate", () => {
+  const ini = CONFIG.cancionInicio, fin = CONFIG.cancionFin;
+  if (song.currentTime < ini - .5) song.currentTime = ini;               // por si arrancó antes de poder saltar
+  else if (fin > ini && song.currentTime >= fin) song.currentTime = ini;  // repite la parte elegida
+});
+function seekStart() {   // saltar al inicio solo funciona cuando el navegador ya conoce la duración
+  const go = () => { try { song.currentTime = CONFIG.cancionInicio; } catch (e) {} };
+  if (song.readyState >= 1) go(); else song.addEventListener("loadedmetadata", go, { once: true });
+}
+song.addEventListener("ended", () => { seekStart(); song.play().catch(() => {}); });
+let fadeT = null, fading = false;
+function fadeSong(to, ms, then) {
+  clearInterval(fadeT); fading = true;
+  const from = song.volume, steps = 25; let i = 0;
+  fadeT = setInterval(() => {
+    const target = typeof to === "function" ? to() : to;
+    i++; song.volume = Math.max(0, Math.min(1, from + (target - from) * i / steps));
+    if (i >= steps) { clearInterval(fadeT); fading = false; then && then(); }
+  }, ms / steps);
+}
+function startSong() {
+  if (!CONFIG.cancion) return;
+  song.muted = muted; song.volume = 0;
+  seekStart();
+  song.play().then(() => fadeSong(() => SONG_MAX * VOL, 2500)).catch(() => {});
+}
+function stopSong() { if (!song.paused) fadeSong(0, 1500, () => song.pause()); }
+
+$("#vol").addEventListener("input", e => {
+  VOL = e.target.value / 100;
+  if (master) master.gain.value = VOL;
+  if (!song.paused && !fading) song.volume = SONG_MAX * VOL;
+});
+$("#mute").addEventListener("click", e => {
+  muted = !muted; song.muted = muted;
+  e.currentTarget.textContent = "SONIDO " + (muted ? "OFF" : "ON");
+  e.currentTarget.setAttribute("aria-pressed", muted);
+});
+
+/* ---------- logros ---------- */
+const queue = []; let toasting = false;
+function achieve(text) { queue.push(text); if (!toasting) nextToast(); }
+function nextToast() {
+  const t = queue.shift(); if (!t) { toasting = false; return; }
+  toasting = true; $("#toastText").textContent = t; sfx("achieve");
+  $("#toast").classList.add("on");
+  setTimeout(() => { $("#toast").classList.remove("on"); setTimeout(nextToast, 400); }, 2400);
+}
+
+/* ---------- FASE 1: caída en zona caliente ---------- */
+const gv = $("#game"), g = gv.getContext("2d");
+let W = 360, H = 450, G = null;
+function fit() {
+  const r = gv.getBoundingClientRect(), d = devicePixelRatio || 1;
+  W = r.width; H = r.height; gv.width = W * d; gv.height = H * d; g.setTransform(d, 0, 0, d, 0, 0);
+}
+addEventListener("resize", () => { if (G && G.run) fit(); });
+function zoneR() { const full = Math.hypot(W, H) / 2; return full - (full - Math.min(W, H) * .36) * Math.min(1, G.hits / (META - 2)); }
+function resetGame() {
+  G = { targets: [], fx: [], hits: 0, heads: 0, shots: 0, spawn: .5, t: 0, last: 0, run: true, mx: -99, my: -99, zr: 0 };
+  $("#feed").innerHTML = ""; $("#wipe").hidden = true; updateHud();
+}
+function updateHud() {
+  $("#hc").textContent = Math.min(G.hits, META) + "/" + META;
+  $("#hs").textContent = G.heads;
+  $("#prog").style.width = Math.min(100, G.hits / META * 100) + "%";
+}
+function spawnTarget() {
+  const R = Math.max(18, Math.min(28, W / 13));
+  const zr = Math.min(G.zr, Math.min(W, H) / 2) - R - 6;
+  for (let k = 0; k < 20; k++) {
+    const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * Math.max(10, zr);
+    const x = W / 2 + Math.cos(a) * d, y = H / 2 + Math.sin(a) * d;
+    if (x > R + 4 && x < W - R - 4 && y > R + 34 && y < H - R - 4) {
+      G.targets.push({ x, y, R, age: 0, max: Math.max(1.2, 2 - G.hits * .06), kind: ["enemy", "heart", "enemy"][Math.random() * 3 | 0] });
+      return;
+    }
+  }
+}
+function cur(t) { const p = t.age / t.max; return t.R * (p < .12 ? p / .12 : p > .75 ? Math.max(.25, 1 - (p - .75) / .25 * .75) : 1); }
+function feed(text, head) {
+  const el = document.createElement("div"); if (head) el.className = "hs";
+  el.innerHTML = "<em></em> ▸ " + text; el.querySelector("em").textContent = CONFIG.nombre.toUpperCase();
+  const f = $("#feed"); f.prepend(el);
+  while (f.children.length > 4) f.lastChild.remove();
+  setTimeout(() => el.remove(), 3500);
+}
+function shoot(x, y, auto) {
+  if (!G || !G.run) return;
+  G.shots++; sfx("shot");
+  let hit = auto ? G.targets[0] : null;
+  if (!hit) for (const t of G.targets) if (Math.hypot(t.x - x, t.y - y) <= cur(t) + 4) { hit = t; break; }
+  if (!hit) { G.fx.push({ x, y, life: .3, miss: true }); return; }
+  const head = !auto && Math.hypot(hit.x - x, hit.y - y) <= cur(hit) * .38;
+  G.targets.splice(G.targets.indexOf(hit), 1);
+  G.hits++; if (head) G.heads++;
+  sfx(head ? "head" : "hit");
+  G.fx.push({ x: hit.x, y: hit.y, life: .6, head });
+  feed((hit.kind === "heart" ? "♥ corazón" : "✕ enemigo") + (head ? " · HEADSHOT" : ""), head);
+  if (G.hits === 1) achieve("Primera eliminación");
+  if (G.heads === 3) achieve("Puntería de leyenda");
+  updateHud();
+  if (G.hits >= META) winGame();
+}
+function localXY(e) { const r = gv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
+gv.addEventListener("pointerdown", e => { e.preventDefault(); const [x, y] = localXY(e); G.mx = x; G.my = y; shoot(x, y); });
+gv.addEventListener("pointermove", e => { if (e.pointerType === "mouse" && G) [G.mx, G.my] = localXY(e); });
+gv.addEventListener("pointerleave", () => { if (G) G.mx = G.my = -99; });
+gv.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && G && G.targets.length) { e.preventDefault(); shoot(0, 0, true); } });
+
+function drawTarget(t, r) {
+  g.save(); g.translate(t.x, t.y);
+  g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fillStyle = "rgba(255,106,19,.14)"; g.fill();
+  g.lineWidth = 2; g.strokeStyle = C.orange; g.stroke();
+  g.strokeStyle = "rgba(236,227,210,.4)"; g.lineWidth = 1;
+  [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { g.beginPath(); g.moveTo(dx * r * .55, dy * r * .55); g.lineTo(dx * r * .95, dy * r * .95); g.stroke(); });
+  const s = r * .4;
+  if (t.kind === "heart") {
+    g.fillStyle = C.blood; g.beginPath(); g.moveTo(0, s * .9);
+    g.bezierCurveTo(-s * 1.4, -s * .1, -s * .6, -s * 1.2, 0, -s * .35);
+    g.bezierCurveTo(s * .6, -s * 1.2, s * 1.4, -s * .1, 0, s * .9); g.fill();
+  } else {
+    g.fillStyle = C.sand; // silueta de casco
+    g.beginPath(); g.arc(0, -s * .1, s * .7, Math.PI, 0); g.lineTo(s * .85, s * .3); g.lineTo(-s * .85, s * .3); g.closePath(); g.fill();
+    g.fillRect(-s * .5, s * .4, s, s * .45);
+  }
+  g.restore();
+}
+function draw() {
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  g.strokeStyle = "rgba(52,48,58,.6)"; g.lineWidth = 1;
+  for (let x = 0; x < W; x += 36) { g.beginPath(); g.moveTo(x + .5, 0); g.lineTo(x + .5, H); g.stroke(); }
+  for (let y = 0; y < H; y += 36) { g.beginPath(); g.moveTo(0, y + .5); g.lineTo(W, y + .5); g.stroke(); }
+  g.fillStyle = "rgba(148,141,153,.45)"; g.font = '10px "Share Tech Mono", monospace'; g.textAlign = "left";
+  "ABCDEFGHIJ".split("").forEach((l, i) => { if (i * 36 + 4 < W) g.fillText(l, i * 36 + 4, 12); });
+  // la zona: afuera se pinta azul
+  G.zr += (zoneR() - G.zr) * .04;
+  g.save(); g.beginPath(); g.rect(0, 0, W, H); g.arc(W / 2, H / 2, G.zr, 0, Math.PI * 2, true);
+  g.fillStyle = "rgba(79,141,255,.18)"; g.fill(); g.restore();
+  g.beginPath(); g.arc(W / 2, H / 2, G.zr, 0, Math.PI * 2); g.strokeStyle = C.zone; g.lineWidth = 2; g.setLineDash([6, 5]); g.stroke(); g.setLineDash([]);
+  for (const t of G.targets) drawTarget(t, cur(t));
+  for (const f of G.fx) {
+    const a = Math.max(0, f.life / (f.miss ? .3 : .6));
+    if (f.miss) { g.fillStyle = `rgba(148,141,153,${a})`; g.fillRect(f.x - 2, f.y - 2, 4, 4); continue; }
+    g.strokeStyle = f.head ? `rgba(224,32,47,${a})` : `rgba(255,106,19,${a})`; g.lineWidth = 2;
+    const k = (1 - a) * 22 + 6;
+    for (let i = 0; i < 4; i++) { const an = i * Math.PI / 2 + Math.PI / 4; g.beginPath(); g.moveTo(f.x + Math.cos(an) * k * .5, f.y + Math.sin(an) * k * .5); g.lineTo(f.x + Math.cos(an) * k, f.y + Math.sin(an) * k); g.stroke(); }
+    if (f.head) { g.fillStyle = `rgba(224,32,47,${a})`; g.font = '15px "Black Ops One", sans-serif'; g.textAlign = "center"; g.fillText("HEADSHOT", f.x, f.y - 24 - (1 - a) * 12); }
+  }
+  if (G.mx > -50) {
+    g.strokeStyle = C.orange; g.lineWidth = 2; const x = G.mx, y = G.my;
+    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { g.beginPath(); g.moveTo(x + dx * 4, y + dy * 4); g.lineTo(x + dx * 10, y + dy * 10); g.stroke(); });
+  }
+}
+function loop(ts) {
+  if (!G.run) return;
+  const dt = Math.min(.05, (ts - (G.last || ts)) / 1000); G.last = ts; G.t += dt;
+  G.spawn -= dt;
+  if (G.spawn <= 0 && G.targets.length < 3) { spawnTarget(); G.spawn = Math.max(.45, .9 - G.hits * .03) + Math.random() * .3; }
+  G.targets.forEach(t => t.age += dt);
+  G.targets = G.targets.filter(t => t.age < t.max);
+  G.fx.forEach(f => f.life -= dt); G.fx = G.fx.filter(f => f.life > 0);
+  draw(); requestAnimationFrame(loop);
+}
+function winGame() {
+  G.run = false; G.targets = []; draw();
+  $("#wipe").hidden = false; sfx("wipe");
+  achieve("Escuadrón eliminado");
+  setTimeout(startDrop, 2200);
+}
+
+/* ---------- FASE 2: airdrop con loot de recuerdos ---------- */
+const kv = $("#drop"), k = kv.getContext("2d");
+let D = null;
+function px(arr, x, y, c) { k.fillStyle = c; arr.forEach((row, j) => { for (let i = 0; i < row.length; i++) if (row[i] === "X") k.fillRect(x + i, y + j, 1, 1); }); }
+const HEART = [".XX.XX.", "XXXXXXX", ".XXXXX.", "..XXX..", "...X..."];
+const BIG_HEART = [
+  "..XXXX....XXXX..",
+  ".XXXXXX..XXXXXX.",
+  "XXXXXXXXXXXXXXXX",
+  "XXXXXXXXXXXXXXXX",
+  "XXXXXXXXXXXXXXXX",
+  ".XXXXXXXXXXXXXX.",
+  "..XXXXXXXXXXXX..",
+  "...XXXXXXXXXX...",
+  "....XXXXXXXX....",
+  ".....XXXXXX.....",
+  "......XXXX......",
+  ".......XX......."
+];
+const DIGITS = { 0: ["XXX", "X.X", "X.X", "X.X", "XXX"], 1: [".X.", "XX.", ".X.", ".X.", "XXX"], 2: ["XXX", "..X", "XXX", "X..", "XXX"], 3: ["XXX", "..X", "XXX", "..X", "XXX"], 4: ["X.X", "X.X", "XXX", "..X", "..X"], 5: ["XXX", "X..", "XXX", "..X", "XXX"], 6: ["XXX", "X..", "XXX", "X.X", "XXX"], 7: ["XXX", "..X", "..X", "..X", "..X"], 8: ["XXX", "X.X", "XXX", "X.X", "XXX"], 9: ["XXX", "X.X", "XXX", "..X", "XXX"] };
+function drawCrate(y, shake) {
+  const x = 28 + (shake ? (Math.random() * 2 - 1) * shake : 0);
+  k.fillStyle = "#a8460e"; k.fillRect(x, y, 40, 28);
+  k.fillStyle = C.orange; k.fillRect(x + 2, y + 2, 36, 24);
+  k.fillStyle = "#a8460e"; for (let i = 0; i < 3; i++) k.fillRect(x + 2, y + 9 + i * 7, 36, 1);
+  k.fillStyle = C.sand; k.fillRect(x + 18, y, 4, 28); k.fillRect(x, y + 12, 40, 4);
+  px(HEART, x + 6, y + 4, C.blood); px(HEART, x + 27, y + 19, C.blood);
+}
+function drawChute(cx, y) {
+  k.fillStyle = C.sand; k.beginPath(); k.arc(cx, y, 22, Math.PI, 0); k.fill();
+  k.fillStyle = C.orange; for (let i = -16; i < 22; i += 12) k.fillRect(cx + i, y - 14, 6, 14);
+  k.fillStyle = C.dim; [-21, -8, 8, 21].forEach(o => k.fillRect(cx + o, y, 1, 12));
+}
+function drawOpen() {
+  // caja abierta con un corazón latiendo y el número de meses
+  const beat = 1 + Math.max(0, Math.sin(D.t * 5)) * .12;
+  k.fillStyle = "rgba(255,194,71,.12)"; k.beginPath(); k.arc(48, 36, 30 * beat, 0, Math.PI * 2); k.fill();
+  k.fillStyle = "#a8460e"; k.fillRect(26, 56, 44, 18);
+  k.fillStyle = C.orange; k.fillRect(28, 58, 40, 14);
+  k.fillStyle = C.sand; k.fillRect(46, 56, 4, 18);
+  k.save(); k.translate(48, 34); k.scale(beat * 2, beat * 2); k.translate(-8, -6);
+  px(BIG_HEART, 0, 0, C.blood);
+  const digits = String(CONFIG.meses).split("");
+  const w = digits.length * 4 - 1; let x0 = 8 - Math.ceil(w / 2);
+  digits.forEach(dg => { px(DIGITS[dg], x0, 2, C.sand); x0 += 4; });
+  k.restore();
+  for (let i = 0; i < 8; i++) { // destellos
+    const a = D.t * .8 + i * Math.PI / 4, r = 34 + Math.sin(D.t * 3 + i) * 3;
+    k.fillStyle = i % 2 ? C.gold : C.sand; k.fillRect(48 + Math.cos(a) * r, 34 + Math.sin(a) * r * .7, 2, 2);
+  }
+}
+function dropLoop(ts) {
+  if (!D || !D.run) return;
+  const dt = Math.min(.05, (ts - (D.last || ts)) / 1000); D.last = ts; D.t += dt;
+  k.fillStyle = C.bg; k.fillRect(0, 0, 96, 80);
+  if (D.phase === "fall" || D.phase === "closed") // humo de señal
+    for (let i = 0; i < 6; i++) { const yy = 70 - ((D.t * 14 + i * 9) % 54); k.fillStyle = `rgba(224,32,47,${.12 + .05 * (i % 2)})`; k.fillRect(78 + Math.sin(D.t * 2 + i) * 3, yy, 6, 6); }
+  if (D.phase === "fall") {
+    D.y = Math.min(42, D.y + 18 * dt);
+    drawChute(48 + Math.sin(D.t * 2.2) * 3, D.y - 12); drawCrate(D.y, 0);
+    if (D.y >= 42) { D.phase = "closed"; sfx("thud"); D.dust = .6; $("#dropMsg").textContent = "¡Llegó tu airdrop!"; $("#dropBtn").hidden = false; }
+  } else if (D.phase === "closed") {
+    drawCrate(42, D.shake); D.shake = Math.max(0, D.shake - dt * 8);
+    if (D.dust > 0) { D.dust -= dt; k.fillStyle = `rgba(236,227,210,${D.dust * .5})`; k.fillRect(18, 66, 60, 4); }
+    k.fillStyle = C.sand; for (let i = 0; i < D.taps; i++) k.fillRect(42 + i * 5, 74, 3, 3);
+  } else if (D.phase === "flash") {
+    D.flash -= dt; drawOpen(); k.fillStyle = `rgba(255,194,71,${Math.max(0, D.flash)})`; k.fillRect(0, 0, 96, 80);
+    if (D.flash <= 0) { D.phase = "open"; showLoot(); }
+  } else {
+    drawOpen();
+  }
+  requestAnimationFrame(dropLoop);
+}
+function startDrop() {
+  D = { phase: "fall", y: -30, t: 0, last: 0, taps: 0, shake: 0, dust: 0, flash: 0, run: true, opened: 0 };
+  $("#dropMsg").textContent = "Suministros en camino";
+  $("#dropBtn").hidden = true; $("#loot").hidden = true; $("#toChat").hidden = true;
+  $("#dropBox").classList.remove("small-box");
+  show("s-drop"); stage("FASE 2"); sfx("plane");
+  requestAnimationFrame(dropLoop);
+}
+function knock() {
+  if (!D || D.phase !== "closed") return;
+  D.taps++; D.shake = 3; sfx("knock");
+  if (D.taps >= 3) { D.phase = "flash"; D.flash = 1; fanfare(); $("#dropBtn").hidden = true; achieve("Loot legendario: " + MESES_TXT); }
+}
+function showLoot() {
+  $("#dropMsg").textContent = "Loot de " + MESES_TXT;
+  $("#dropBox").classList.add("small-box");
+  const box = $("#loot"); box.innerHTML = "";
+  CONFIG.recuerdos.forEach(([title, text], i) => {
+    const c = document.createElement("button"); c.className = "card"; c.type = "button";
+    c.innerHTML = '<small></small><b></b><p class="hide"></p><span class="tap">Toca para abrir ▸</span>';
+    c.querySelector("small").textContent = "Mes " + (i + 1) + " · Legendario";
+    c.querySelector("b").textContent = title;
+    c.querySelector("p").textContent = text;
+    c.addEventListener("click", () => {
+      if (c.classList.contains("open")) return;
+      c.classList.add("open"); sfx("card"); D.opened++;
+      if (D.opened === CONFIG.recuerdos.length) { achieve("Recuerdos recolectados"); setTimeout(() => { $("#toChat").hidden = false; }, 700); }
+    });
+    box.append(c);
+  });
+  box.hidden = false;
+  if (!CONFIG.recuerdos.length) $("#toChat").hidden = false;
+}
+kv.addEventListener("click", knock);
+$("#dropBtn").addEventListener("click", knock);
+
+/* ---------- confeti ---------- */
+const cf = $("#confetti"), cx = cf.getContext("2d");
+function confetti() {
+  if (reduce) return;
+  cf.width = innerWidth; cf.height = innerHeight;
+  const cols = [C.orange, C.gold, C.blood, C.sand];
+  const ps = Array.from({ length: 150 }, () => ({ x: Math.random() * cf.width, y: -Math.random() * cf.height * .6, v: 90 + Math.random() * 150, w: 3 + Math.random() * 4, h: 6 + Math.random() * 8, c: cols[Math.random() * 4 | 0], p: Math.random() * 6, r: Math.random() * 6 }));
+  let last = 0, t = 0;
+  (function f(ts) {
+    const dt = Math.min(.05, (ts - (last || ts)) / 1000); last = ts; t += dt;
+    cx.clearRect(0, 0, cf.width, cf.height);
+    for (const p of ps) { p.y += p.v * dt; p.x += Math.sin(t * 3 + p.p) * 1.2; p.r += dt * 5; cx.save(); cx.translate(p.x, p.y); cx.rotate(p.r); cx.fillStyle = p.c; cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); cx.restore(); }
+    if (t < 5) requestAnimationFrame(f); else cx.clearRect(0, 0, cf.width, cf.height);
+  })(performance.now());
+}
+
+/* ---------- FASE 3: chat del escuadrón ---------- */
+let mi = 0, typing = false, timer = null, line = null, chatDone = false;
+function addLine(text, cls) {
+  const p = document.createElement("p"); p.className = "msg" + (cls ? " " + cls : "");
+  p.textContent = text; $("#chat").append(p); $("#chat").scrollTop = 1e6; return p;
+}
+function typeMsg() {
+  clearTimeout(timer);
+  const full = MENSAJES[mi];
+  $("#count").textContent = (mi + 1) + "/" + MENSAJES.length;
+  line = document.createElement("p"); line.className = "msg";
+  line.innerHTML = '<span class="ch">[Escuadrón] </span><span class="who"></span>: <span class="tx"></span><span class="caret"></span>';
+  line.querySelector(".who").textContent = CONFIG.nombreChat;
+  $("#chat").append(line); sfx("msg");
+  const tx = line.querySelector(".tx");
+  const done = () => { typing = false; line.querySelector(".caret")?.remove(); $("#chat").scrollTop = 1e6; };
+  if (reduce) { tx.textContent = full; done(); return; }
+  let ci = 0; typing = true;
+  (function tick() {
+    ci++; tx.textContent = full.slice(0, ci); $("#chat").scrollTop = 1e6;
+    if (ci % 2 === 0 && full[ci - 1] !== " ") sfx("type");
+    if (ci < full.length) timer = setTimeout(tick, ".,!?".includes(full[ci - 1]) ? 200 : 30);
+    else done();
+  })();
+}
+function advance() {
+  if (chatDone) return;
+  if (typing) { clearTimeout(timer); typing = false; line.querySelector(".tx").textContent = MENSAJES[mi]; line.querySelector(".caret")?.remove(); return; }
+  mi++;
+  if (mi < MENSAJES.length) typeMsg();
+  else { chatDone = true; addLine(CONFIG.nombreChat + " te envió una invitación ♥", "sys"); setTimeout(startInvite, 1400); }
+}
+$("#chat").addEventListener("click", advance);
+$("#chat").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); advance(); } });
+$("#toChat").addEventListener("click", () => {
+  D.run = false; mi = 0; chatDone = false; $("#chat").innerHTML = "";
+  startSong();
+  show("s-chat"); stage("FASE 3");
+  addLine(CONFIG.nombreChat + " se ha unido al escuadrón.", "sys");
+  $("#chat").focus(); setTimeout(typeMsg, 600);
+});
+
+/* ---------- FASE 4: invitación (el botón de rechazar se escapa) ---------- */
+const NO_TXT = ["¿Segura? 🥺", "Esa opción no existe", "Error 404: no encontrado", "Inténtalo otra vez...", "Ya, acepta 😏"];
+let dodges = 0;
+function startInvite() {
+  dodges = 0;
+  $("#noBtn").textContent = "RECHAZAR"; $("#noBtn").onclick = null;
+  $("#noBtn").classList.remove("loose"); $("#noBtn").style.left = $("#noBtn").style.top = "";
+  $(".invite-btns").append($("#noBtn"));
+  $("#noMsg").textContent = "Duración: todas las temporadas que quieras.";
+  show("s-invite"); stage("FASE 4");
+}
+function dodge(e) {
+  if (e) e.preventDefault();
+  const no = $("#noBtn"), inv = $("#invite");
+  const box = inv.getBoundingClientRect(), b = no.getBoundingClientRect();
+  if (!no.classList.contains("loose")) {   // la primera vez se suelta en su sitio actual
+    no.style.left = (b.left - box.left) + "px"; no.style.top = (b.top - box.top) + "px";
+    no.classList.add("loose"); inv.append(no); no.offsetWidth;
+  }
+  const yes = $("#yesBtn").getBoundingClientRect();
+  let x, y;
+  for (let i = 0; i < 12; i++) {   // busca un lugar dentro de la tarjeta que no tape ACEPTAR
+    x = 8 + Math.random() * Math.max(0, box.width - b.width - 16);
+    y = 8 + Math.random() * Math.max(0, box.height - b.height - 16);
+    const overlaps = box.left + x < yes.right && box.left + x + b.width > yes.left && box.top + y < yes.bottom && box.top + y + b.height > yes.top;
+    if (!overlaps) break;
+  }
+  no.style.left = x + "px"; no.style.top = y + "px";
+  $("#noMsg").textContent = NO_TXT[Math.min(dodges, NO_TXT.length - 1)];
+  dodges++; sfx("dodge");
+  if (dodges >= 6) {   // se rinde: vuelve junto a ACEPTAR
+    no.textContent = "ACEPTAR TAMBIÉN ♥"; no.onclick = accept;
+    no.classList.remove("loose"); no.style.left = no.style.top = ""; $(".invite-btns").append(no);
+  }
+}
+// un toque dispara pointerdown y luego click: solo cuenta un escape cada 400 ms
+let lastDodge = 0;
+function tryDodge(e) {
+  if (dodges >= 6) return;
+  if (e) e.preventDefault();
+  if (performance.now() - lastDodge < 400) return;
+  lastDodge = performance.now(); dodge();
+}
+$("#noBtn").addEventListener("pointerenter", e => { if (e.pointerType === "mouse") tryDodge(); });
+$("#noBtn").addEventListener("pointerdown", tryDodge);
+$("#noBtn").addEventListener("click", tryDodge);
+function accept() { achieve("Nueva temporada desbloqueada"); confetti(); finish(); }
+$("#yesBtn").addEventListener("click", accept);
+
+/* ---------- victoria ---------- */
+function finish() {
+  $("#sh").textContent = G ? G.hits : META;
+  $("#shs").textContent = G ? G.heads : 0;
+  $("#sp").textContent = G ? Math.round(G.hits / Math.max(1, G.shots) * 100) + "%" : "100%";
+  $("#sl").textContent = (D ? D.opened : 0) + "/" + CONFIG.recuerdos.length;
+  $("#juntos").textContent = Math.max(0, Math.floor((Date.now() - INICIO) / 86400000)).toLocaleString("es");
+  $("#firma").textContent = CONFIG.firma;
+  stage("PARTIDA TERMINADA");
+  show("s-end"); setTimeout(confetti, 300); achieve("#1 · " + MESES_TXT + " invictos");
+}
+$("#replaySong").addEventListener("click", () => { if (CONFIG.cancion) { clearInterval(fadeT); startSong(); } else fanfare(); confetti(); });
+$("#restart").addEventListener("click", () => { stopSong(); show("s-title"); stage("SELECCIÓN DE STRIKER"); });
+
+/* ---------- inicio ---------- */
+$("#startBtn").addEventListener("click", () => {
+  audio(); sfx("jump");
+  resetGame(); show("s-game"); stage("FASE 1");
+  fit(); G.zr = zoneR(); gv.focus(); requestAnimationFrame(loop);
+});
+
+/* ---------- lobby: bloqueo hasta el aniversario ---------- */
+const pad = n => String(n).padStart(2, "0");
+let lockTimer = null;
+function checkLock() {
+  const left = DESBLOQUEO - Date.now();
+  if (!CONFIG.bloqueo || left <= 0 || location.hash === "#prueba") {
+    clearInterval(lockTimer);
+    if (!$("#s-lock").hidden) { show("s-title"); stage("SELECCIÓN DE STRIKER"); }
+    return;
+  }
+  const s = Math.floor(left / 1000);
+  $("#cd-d").textContent = pad(Math.floor(s / 86400));
+  $("#cd-h").textContent = pad(Math.floor(s % 86400 / 3600));
+  $("#cd-m").textContent = pad(Math.floor(s % 3600 / 60));
+  $("#cd-s").textContent = pad(s % 60);
+  stage("LOBBY");
+}
+addEventListener("hashchange", checkLock);
+checkLock();
+lockTimer = setInterval(checkLock, 1000);
+</script>
